@@ -3,7 +3,7 @@ import org.kde.bluezqt as BluezQt
 
 /*
  * BluetoothModule.qml
- * Bluetooth adapter state, operational readiness, and paired/connected devices.
+ * Bluetooth adapter state, operational readiness, and paired/connected devices with toggle.
  */
 BaseModule {
     id: btMod
@@ -18,12 +18,17 @@ BaseModule {
     readonly property int deviceCount: connectedDevices.length
 
     readonly property string statusText: {
-        if (!isOperational) return "Bluetooth Off";
+        if (!isOperational || isBluetoothBlocked) return "Bluetooth Off";
         if (hasConnectedDevices) {
             var first = connectedDevices[0];
             var devName = (first && first.name) ? first.name : "Device";
             return deviceCount > 1 ? devName + " (+" + (deviceCount - 1) + ")" : devName;
         }
         return "Bluetooth On";
+    }
+
+    function toggleBluetooth() {
+        if (!BluezQt.Manager) return;
+        BluezQt.Manager.bluetoothBlocked = !BluezQt.Manager.bluetoothBlocked;
     }
 }

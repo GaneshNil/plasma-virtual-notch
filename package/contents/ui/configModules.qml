@@ -72,3 +72,4 @@ Kirigami.FormLayout {
         text: "Current weather conditions and temperature"
     }
 }
+

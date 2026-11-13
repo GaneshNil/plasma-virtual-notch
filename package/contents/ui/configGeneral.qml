@@ -82,3 +82,4 @@ Kirigami.FormLayout {
         placeholderText: "e.g. Pune, Tokyo, London"
     }
 }
+
