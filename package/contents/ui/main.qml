@@ -1,16 +1,12 @@
 /*
- * Virtual Notch — a MacBook-style notch / Dynamic Island for Plasma 6 (Wayland).
+ * Virtual Notch — Modular Dynamic Island for Plasma 6 (Wayland).
  *
- * - Drawn in its own click-through layer-shell overlay: no panel, no border, never blocks the
- *   browser tabs or anything else underneath it.
- * - Collapsed: clock · camera lens · equalizer (music playing) or weather (icon + temp; CPU temp if no city set).
- *   Mic in use → orange pulsing mic + app name + glow (event-driven, no polling).
- * - Mouse near it → slides away (browser tabs show). Mouse pushed to the top edge above it
- *   (dwell ~0.6 s) → morphs into a stats card. Hover detection comes from the small
- *   "virtualnotch" KWin script (the overlay itself ignores the mouse), via Plasmoid config "hover".
- * - Sensors are only subscribed while the card is open (CPU temp: every 5 s for the notch).
- *
- * This applet lives invisibly (0 px) in a panel; it only hosts the overlay window.
+ * - Click-through layer-shell overlay: no panel, no border, never blocks browser tabs.
+ * - 3 Morphing States:
+ *     1. Compact State: Clock, camera lens, weather/equalizer/CPU fallback.
+ *     2. Activity State (Dynamic Island Pulse): Ephemeral notifications, mic activation, volume, track change.
+ *     3. Expanded State (Dashboard Card): Media controls, quick toggles, system stats.
+ * - Modular feature loading: each module is an isolated component activated on demand.
  */
 import QtQuick
 import QtQuick.Layouts
@@ -22,44 +18,75 @@ import org.kde.ksysguard.sensors as Sensors
 import org.kde.plasma.private.volume as Vol
 import org.kde.plasma.private.mpris as Mpris
 import org.kde.layershell as LayerShell
+import "components" as Components
 
 PlasmoidItem {
     id: root
 
-    // ---------- palette ----------
-    readonly property color cBg: "#000000"
+    // ---------- Event Queue & State Arbiter ----------
+    readonly property Components.EventQueue eventQueue: Components.EventQueue {
+        defaultDurationMs: Plasmoid.configuration.activityDurationMs || 3500
+    }
+
+    // ---------- Palette & Theming (Configurable) ----------
+    readonly property color cBg: Plasmoid.configuration.backgroundColor || "#000000"
     readonly property color cText: "#e0d4ff"
     readonly property color cDim: "#6c6c80"
-    readonly property color cAccent: "#c77dff"
-    readonly property color cPink: "#ff8fd8"
+    readonly property color cAccent: Plasmoid.configuration.accentColor || "#c77dff"
+    readonly property color cPink: Plasmoid.configuration.musicAccentColor || "#ff8fd8"
     readonly property color cCyan: "#5cf2ff"
-    readonly property color cMic: "#ff9f43"
+    readonly property color cMic: Plasmoid.configuration.micAccentColor || "#ff9f43"
     readonly property color cGood: "#5cffa0"
     readonly property color cWarn: "#ffd75c"
     readonly property color cHot: "#ff5c8a"
-    readonly property string monoFont: Kirigami.Theme.fixedWidthFont.family   // your system monospace font
+    readonly property string monoFont: Kirigami.Theme.fixedWidthFont.family
+    readonly property bool rimGlowEnabled: Plasmoid.configuration.rimGlowEnabled !== undefined ? Plasmoid.configuration.rimGlowEnabled : true
+    readonly property real customBackgroundOpacity: Plasmoid.configuration.customBackgroundOpacity !== undefined ? Plasmoid.configuration.customBackgroundOpacity : 1.0
 
-    // ---------- geometry ----------
-    readonly property int notchW: 250
-    readonly property int notchH: 32
-    readonly property int cardW: 380
-    readonly property int fillet: 10          // concave "shoulders" where the notch meets the top edge
+    // ---------- Geometry (Configurable) ----------
+    readonly property int notchW: Plasmoid.configuration.notchWidth || 250
+    readonly property int notchH: Plasmoid.configuration.notchHeight || 32
+    readonly property int cardW: Plasmoid.configuration.cardWidth || 380
+    readonly property int fillet: Plasmoid.configuration.filletRadius || 10
+    readonly property int notchCornerRadius: Plasmoid.configuration.notchCornerRadius || 14
+    readonly property int cardCornerRadius: Plasmoid.configuration.cardCornerRadius || 26
 
-    // ---------- state ----------
+    // ---------- Feature Switches ----------
+    readonly property bool enableMedia: Plasmoid.configuration.enableMedia !== undefined ? Plasmoid.configuration.enableMedia : true
+    readonly property bool enableMicrophone: Plasmoid.configuration.enableMicrophone !== undefined ? Plasmoid.configuration.enableMicrophone : true
+    readonly property bool enableNotifications: Plasmoid.configuration.enableNotifications !== undefined ? Plasmoid.configuration.enableNotifications : true
+    readonly property bool enableSystemMonitor: Plasmoid.configuration.enableSystemMonitor !== undefined ? Plasmoid.configuration.enableSystemMonitor : true
+    readonly property bool enableAudio: Plasmoid.configuration.enableAudio !== undefined ? Plasmoid.configuration.enableAudio : true
+    readonly property bool enableNetwork: Plasmoid.configuration.enableNetwork !== undefined ? Plasmoid.configuration.enableNetwork : true
+    readonly property bool enableBluetooth: Plasmoid.configuration.enableBluetooth !== undefined ? Plasmoid.configuration.enableBluetooth : true
+    readonly property bool enableBattery: Plasmoid.configuration.enableBattery !== undefined ? Plasmoid.configuration.enableBattery : true
+    readonly property bool enableUsb: Plasmoid.configuration.enableUsb !== undefined ? Plasmoid.configuration.enableUsb : true
+    readonly property bool enableClipboard: Plasmoid.configuration.enableClipboard !== undefined ? Plasmoid.configuration.enableClipboard : false
+    readonly property bool enableWeather: Plasmoid.configuration.enableWeather !== undefined ? Plasmoid.configuration.enableWeather : true
+    readonly property bool slideAwayEnabled: Plasmoid.configuration.slideAwayEnabled !== undefined ? Plasmoid.configuration.slideAwayEnabled : true
+
+    // ---------- State ----------
     property var micApps: []
-    readonly property bool micActive: micApps.length > 0
+    readonly property bool micActive: enableMicrophone && micApps.length > 0
     readonly property int hoverLevel: Plasmoid.configuration.hover
     property bool open: false
-    readonly property bool wantStats: open
+    readonly property bool wantStats: open && enableSystemMonitor
 
-    // media (MPRIS)
+    // Media (MPRIS)
     Mpris.Mpris2Model { id: mpris }
-    readonly property var player: mpris.currentPlayer
-    readonly property bool playing: !!player && player.playbackStatus === Mpris.PlaybackStatus.Playing
+    readonly property var player: enableMedia ? mpris.currentPlayer : null
+    readonly property bool playing: enableMedia && !!player && player.playbackStatus === Mpris.PlaybackStatus.Playing
     readonly property string trackTitle: player ? (player.track || "") : ""
     readonly property string trackArtist: player ? (player.artist || "") : ""
 
-    // ---------- hosting applet: invisible in the panel ----------
+    // Trigger activity pulse on track change
+    onTrackTitleChanged: {
+        if (trackTitle !== "" && enableMedia) {
+            eventQueue.postEvent("media", trackTitle + (trackArtist ? " - " + trackArtist : ""), 1, 3200, cPink);
+        }
+    }
+
+    // ---------- Hosting Applet (Invisible in panel) ----------
     preferredRepresentation: compactRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     compactRepresentation: Item {
@@ -70,21 +97,25 @@ PlasmoidItem {
     toolTipMainText: ""
     toolTipSubText: ""
 
-    // ---------- hover logic (levels from the KWin script) ----------
-    // 1 = mouse near the notch -> get out of the way; 3 = top edge -> open stats after a dwell
+    // ---------- Hover Logic (KWin Script Bridge) ----------
     readonly property bool hidden: hoverLevel === 1 && !open
-    Timer { id: dwell; interval: 600; onTriggered: if (root.hoverLevel === 3) root.open = true }
+    Timer { 
+        id: dwell
+        interval: Plasmoid.configuration.dwellTimeMs || 600
+        onTriggered: if (root.hoverLevel === 3) root.open = true 
+    }
     onHoverLevelChanged: {
         if (hoverLevel === 3) { if (!open) dwell.restart(); }
         else if (hoverLevel === 1) { dwell.stop(); open = false; }
-        else if (hoverLevel === 2) { dwell.stop(); }          // keep card open while over it, never open from here
+        else if (hoverLevel === 2) { dwell.stop(); }
         else { dwell.stop(); open = false; }
     }
 
-    // ---------- microphone detection ----------
+    // ---------- Microphone Detection (PipeWire/PulseAudio) ----------
     readonly property var ignoreRe: /easyeffects|pulseeffects|cava|pavucontrol|plasma|kmix|speech-dispatcher|xdg-desktop-portal/i
     Instantiator {
         id: sourceInst
+        active: root.enableMicrophone
         model: Vol.SourceModel {}
         delegate: QtObject { readonly property var obj: model.PulseObject }
         onObjectAdded: Qt.callLater(root.recompute)
@@ -92,6 +123,7 @@ PlasmoidItem {
     }
     Instantiator {
         id: outInst
+        active: root.enableMicrophone
         model: Vol.SourceOutputModel {}
         delegate: QtObject {
             readonly property var obj: model.PulseObject
@@ -108,6 +140,7 @@ PlasmoidItem {
         return (o.client && o.client.name) || p["application.name"] || p["node.name"] || o.name || "App";
     }
     function recompute() {
+        if (!enableMicrophone) { micApps = []; return; }
         const monitors = {};
         for (let i = 0; i < sourceInst.count; i++) {
             const s = sourceInst.objectAt(i);
@@ -124,12 +157,16 @@ PlasmoidItem {
             if (ignoreRe.test(n) || ignoreRe.test(p["application.process.binary"] || "")) continue;
             if (apps.indexOf(n) < 0) apps.push(n);
         }
-        if (apps.join("|") !== micApps.join("|")) console.info("virtual-notch mic:", apps.length ? apps.join(", ") : "off");
+        if (apps.join("|") !== micApps.join("|")) {
+            console.info("virtual-notch mic:", apps.length ? apps.join(", ") : "off");
+            if (apps.length > 0 && micApps.length === 0) {
+                eventQueue.postEvent("microphone", "Mic active: " + apps.join(", "), 3, 4000, cMic);
+            }
+        }
         micApps = apps;
     }
 
-    // ---------- sensors ----------
-    // machine-specific IDs come from the config (filled in by install.sh); empty -> that row is hidden
+    // ---------- Hardware Sensors (ksystemstats) ----------
     readonly property string gpuBase: Plasmoid.configuration.gpuSensor || ""
     readonly property string batBase: Plasmoid.configuration.batterySensor || ""
     readonly property bool hasGpu: gpuBase !== ""
@@ -138,7 +175,8 @@ PlasmoidItem {
     readonly property string ssdId: Plasmoid.configuration.ssdSensor || ""
     readonly property bool hasFan: fanId !== ""
     readonly property bool hasSsd: ssdId !== ""
-    Sensors.Sensor { id: cpuTemp;  sensorId: "cpu/all/averageTemperature"; updateRateLimit: root.open ? 1500 : 5000 }
+
+    Sensors.Sensor { id: cpuTemp;  sensorId: "cpu/all/averageTemperature"; updateRateLimit: root.open ? 1500 : 5000; enabled: root.enableSystemMonitor }
     Sensors.Sensor { id: cpuUse;   sensorId: "cpu/all/usage"; updateRateLimit: 1500; enabled: root.wantStats }
     Sensors.Sensor { id: gpuTemp;  sensorId: root.gpuBase ? root.gpuBase + "/temperature" : ""; updateRateLimit: 1500; enabled: root.wantStats && root.hasGpu }
     Sensors.Sensor { id: gpuUse;   sensorId: root.gpuBase ? root.gpuBase + "/usage" : ""; updateRateLimit: 1500; enabled: root.wantStats && root.hasGpu }
@@ -162,15 +200,15 @@ PlasmoidItem {
     readonly property real v_fan: num(fan)
     readonly property real v_ssdTemp: num(ssdTemp)
     readonly property real v_uptime: num(uptime)
-    // ---------- weather (Open-Meteo: free, no API key) ----------
-    // City from config ("weatherCity"); empty -> notch shows CPU temperature instead.
+
+    // ---------- Weather (Open-Meteo) ----------
     readonly property string weatherCity: Plasmoid.configuration.weatherCity || ""
     property real wLat: NaN
     property real wLon: NaN
     property real weatherTemp: NaN
     property int weatherCode: -1
     property bool weatherDay: true
-    readonly property bool weatherOk: weatherCity !== "" && !isNaN(weatherTemp)
+    readonly property bool weatherOk: enableWeather && weatherCity !== "" && !isNaN(weatherTemp)
     readonly property string weatherIcon: weatherIconFor(weatherCode, weatherDay)
     function weatherIconFor(c, day) {
         if (c < 0) return "";
@@ -184,7 +222,7 @@ PlasmoidItem {
         if (c >= 95) return "weather-storm";
         return "weather-clouds";
     }
-    property bool weatherBusy: false        // one request chain at a time
+    property bool weatherBusy: false
     function getJson(url, ok) {
         const x = new XMLHttpRequest();
         x.onreadystatechange = function () {
@@ -199,7 +237,7 @@ PlasmoidItem {
         x.send();
     }
     function refreshWeather() {
-        if (weatherCity === "" || weatherBusy) return;
+        if (!enableWeather || weatherCity === "" || weatherBusy) return;
         weatherBusy = true;
         if (isNaN(wLat)) {
             getJson("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + encodeURIComponent(weatherCity), function (d) {
@@ -218,23 +256,23 @@ PlasmoidItem {
         });
     }
     onWeatherCityChanged: { wLat = NaN; wLon = NaN; weatherTemp = NaN; weatherCode = -1; Qt.callLater(refreshWeather); }
-    Timer {   // every 15 min (Open-Meteo updates current conditions every 15 min)
+    Timer {
         interval: 15 * 60 * 1000; repeat: true; triggeredOnStart: true
-        running: root.weatherCity !== ""
-        onTriggered: Qt.callLater(root.refreshWeather)   // callLater merges this with onWeatherCityChanged at startup
+        running: root.enableWeather && root.weatherCity !== ""
+        onTriggered: Qt.callLater(root.refreshWeather)
     }
-    Timer { id: weatherRetry; interval: 60 * 1000; onTriggered: root.refreshWeather() }   // offline / after resume
+    Timer { id: weatherRetry; interval: 60 * 1000; onTriggered: root.refreshWeather() }
 
     function tempColor(t) { return t >= 80 ? cHot : t >= 62 ? cWarn : cGood; }
     function loadColor(p) { return p >= 85 ? cHot : p >= 60 ? cWarn : cAccent; }
 
     // =====================================================================
-    //  The overlay window (click-through, above normal windows, no border)
+    //  LayerShell Overlay Window
     // =====================================================================
     Window {
         id: overlay
         width: root.cardW + 2 * root.fillet + 80
-        height: 500
+        height: 520
         color: "transparent"
         flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | Qt.WindowTransparentForInput
         visible: true
@@ -246,8 +284,6 @@ PlasmoidItem {
         LayerShell.Window.activateOnShow: false
         LayerShell.Window.scope: "virtual-notch"
 
-        // Self-heal: after suspend/resume or a display change the compositor can drop the
-        // layer surface. Re-create it (hide + show) whenever the screen setup changes.
         onScreenChanged: reattach.restart()
         property bool _cycling: false
         onVisibleChanged: if (!visible && !_cycling) reattach.restart()

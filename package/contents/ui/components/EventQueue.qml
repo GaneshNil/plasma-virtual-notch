@@ -89,3 +89,4 @@ QtObject {
         _pendingEvents = filtered;
     }
 }
+

@@ -33,3 +33,4 @@ Item {
     // Emitted when a transient event happens that should briefly wake up the island
     signal triggerActivity(string reason, int durationMs)
 }
+
