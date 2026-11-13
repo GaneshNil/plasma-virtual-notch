@@ -4,11 +4,97 @@
       xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
   <kcfgfile name=""/>
   <group name="General">
-    <!-- No multi-line comments in this file: Plasma's parser drops the entries after them. -->
-    <!-- Set by the virtualnotch KWin script: 0 away, 1 near the notch, 2 over the card, 3 top edge -->
+    <!-- Hover state from KWin script: 0=away, 1=near, 2=over card, 3=top edge -->
     <entry name="hover" type="Int">
       <default>0</default>
     </entry>
+    <!-- Notch Geometry -->
+    <entry name="notchWidth" type="Int">
+      <default>250</default>
+    </entry>
+    <entry name="notchHeight" type="Int">
+      <default>32</default>
+    </entry>
+    <entry name="cardWidth" type="Int">
+      <default>380</default>
+    </entry>
+    <entry name="filletRadius" type="Int">
+      <default>10</default>
+    </entry>
+    <entry name="notchCornerRadius" type="Int">
+      <default>14</default>
+    </entry>
+    <entry name="cardCornerRadius" type="Int">
+      <default>26</default>
+    </entry>
+
+    <!-- Appearance & Theme -->
+    <entry name="backgroundColor" type="Color">
+      <default>#000000</default>
+    </entry>
+    <entry name="accentColor" type="Color">
+      <default>#c77dff</default>
+    </entry>
+    <entry name="musicAccentColor" type="Color">
+      <default>#ff8fd8</default>
+    </entry>
+    <entry name="micAccentColor" type="Color">
+      <default>#ff9f43</default>
+    </entry>
+    <entry name="rimGlowEnabled" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="customBackgroundOpacity" type="Double">
+      <default>1.0</default>
+    </entry>
+
+    <!-- Timing & Behavior -->
+    <entry name="dwellTimeMs" type="Int">
+      <default>600</default>
+    </entry>
+    <entry name="activityDurationMs" type="Int">
+      <default>3500</default>
+    </entry>
+    <entry name="slideAwayEnabled" type="Bool">
+      <default>true</default>
+    </entry>
+
+    <!-- Feature Module Toggles -->
+    <entry name="enableMedia" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableMicrophone" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableNotifications" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableSystemMonitor" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableAudio" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableNetwork" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableBluetooth" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableBattery" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableUsb" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableClipboard" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="enableWeather" type="Bool">
+      <default>true</default>
+    </entry>
+
+    <!-- Hardware Sensors & Location -->
     <entry name="gpuSensor" type="String">
       <default>gpu/gpu0</default>
     </entry>
