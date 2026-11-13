@@ -19,6 +19,9 @@ Item {
     property int currentCardIndex: 0
     readonly property int totalCards: 3
 
+    // Sub-view in Controls tab: "overview", "wifi_list", "clipboard", "calendar"
+    property string controlsSubView: "overview"
+
     // Focus management for keyboard navigation
     focus: true
     Keys.forwardTo: [navHandler]
@@ -26,6 +29,11 @@ Item {
     Item {
         id: navHandler
         Keys.onPressed: function(event) {
+            if (card.controlsSubView !== "overview" && event.key === Qt.Key_Escape) {
+                card.controlsSubView = "overview";
+                event.accepted = true;
+                return;
+            }
             if (event.key === Qt.Key_Left) {
                 card.previousTab();
                 event.accepted = true;
@@ -46,11 +54,13 @@ Item {
     }
 
     function nextTab() {
+        controlsSubView = "overview";
         if (currentCardIndex < totalCards - 1) currentCardIndex++;
         else currentCardIndex = 0;
     }
 
     function previousTab() {
+        controlsSubView = "overview";
         if (currentCardIndex > 0) currentCardIndex--;
         else currentCardIndex = totalCards - 1;
     }
@@ -118,9 +128,7 @@ Item {
             }
         }
 
-        // =====================================================================
-        // Dynamic Island Tab Navigation Header (Click + Keyboard Focus)
-        // =====================================================================
+        // Dynamic Island Tab Navigation Header
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 4
@@ -129,7 +137,6 @@ Item {
                 Layout.fillWidth: true
                 spacing: 6
 
-                // Previous Button (<--)
                 Rectangle {
                     width: 72; height: 26; radius: 13
                     color: "#181824"; border.color: "#28283c"; border.width: 1
@@ -150,7 +157,6 @@ Item {
                 Text { text: "← / →"; color: card.n.cDim; font.pixelSize: 10; font.family: card.n.monoFont }
                 Item { Layout.fillWidth: true }
 
-                // Next Button (-->)
                 Rectangle {
                     width: 58; height: 26; radius: 13
                     color: "#181824"; border.color: "#28283c"; border.width: 1
@@ -212,7 +218,7 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: card.currentCardIndex = index
+                            onClicked: { card.controlsSubView = "overview"; card.currentCardIndex = index; }
                         }
                     }
                 }
@@ -296,7 +302,6 @@ Item {
                     Layout.fillWidth: true
                     spacing: 14
 
-                    // Large Album Artwork
                     Rectangle {
                         Layout.preferredWidth: 64; Layout.preferredHeight: 64; radius: 12; color: "#14141c"; clip: true
                         Image {
@@ -330,7 +335,6 @@ Item {
                     }
                 }
 
-                // Playback Control Buttons
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 24
@@ -371,7 +375,7 @@ Item {
                 }
             }
 
-            // ----------------- CARD 2: COMPLETE FUNCTIONAL CONTROLS -----------------
+            // ----------------- CARD 2: INTERACTIVE CONTROLS -----------------
             ColumnLayout {
                 id: controlsSection
                 width: parent.width
@@ -382,207 +386,275 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 200 } }
                 spacing: 8
 
-                // Quick Toggle Row: Wi-Fi, Bluetooth, Docker Desktop
-                RowLayout {
+                // Sub-View 1: OVERVIEW (Main Quick Controls)
+                ColumnLayout {
                     Layout.fillWidth: true
+                    visible: card.controlsSubView === "overview"
+                    spacing: 8
+
+                    // Primary Quick Toggles (Wi-Fi, Bluetooth, Clipboard, Docker)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        // Wi-Fi Tile (Click to toggle, double-click/long to view APs)
+                        Rectangle {
+                            Layout.fillWidth: true; Layout.preferredHeight: 38; radius: 8
+                            color: (card.n.networkModule && card.n.networkModule.wifiEnabled) ? "#1a2233" : "#14141c"
+                            border.color: (card.n.networkModule && card.n.networkModule.wifiEnabled) ? "#2b3c70" : "#1f1f2e"
+                            border.width: 1
+
+                            RowLayout {
+                                anchors { fill: parent; margins: 6 }
+                                Kirigami.Icon {
+                                    source: card.n.networkModule ? card.n.networkModule.iconName : "network-wireless-symbolic"
+                                    color: (card.n.networkModule && card.n.networkModule.isConnected) ? card.n.cCyan : card.n.cDim
+                                    Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: (card.n.networkModule && card.n.networkModule.ssid !== "") ? card.n.networkModule.ssid : (card.n.networkModule && card.n.networkModule.wifiEnabled ? "Wi-Fi On" : "Wi-Fi Off")
+                                    color: card.n.cText; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideRight
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (card.n.networkModule) card.n.networkModule.toggleWifi()
+                            }
+                        }
+
+                        // Bluetooth Tile
+                        Rectangle {
+                            Layout.fillWidth: true; Layout.preferredHeight: 38; radius: 8
+                            color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational && !card.n.bluetoothModule.isBluetoothBlocked) ? "#1a2233" : "#14141c"
+                            border.color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational && !card.n.bluetoothModule.isBluetoothBlocked) ? "#2b3c70" : "#1f1f2e"
+                            border.width: 1
+
+                            RowLayout {
+                                anchors { fill: parent; margins: 6 }
+                                Kirigami.Icon {
+                                    source: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "bluetooth-active-symbolic" : "bluetooth-symbolic"
+                                    color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational && !card.n.bluetoothModule.isBluetoothBlocked) ? card.n.cCyan : card.n.cDim
+                                    Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: card.n.bluetoothModule ? card.n.bluetoothModule.statusText : "Bluetooth"
+                                    color: card.n.cText; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideRight
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (card.n.bluetoothModule) card.n.bluetoothModule.toggleBluetooth()
+                            }
+                        }
+
+                        // Clipboard History Button
+                        Rectangle {
+                            Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8
+                            color: "#181824"; border.color: "#28283c"; border.width: 1
+                            Kirigami.Icon {
+                                anchors.centerIn: parent
+                                source: "klipper"
+                                color: card.n.cAccent; Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: card.controlsSubView = "clipboard"
+                            }
+                        }
+
+                        // Docker Desktop Status Tile
+                        Rectangle {
+                            Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8
+                            color: "#14141c"; border.color: "#1f1f2e"; border.width: 1
+                            Kirigami.Icon {
+                                anchors.centerIn: parent
+                                source: "applications-development"
+                                color: card.n.cCyan; Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                            }
+                        }
+                    }
+
+                    // Interactive Master Audio Slider
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 2
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { text: "Audio: " + (card.n.audioModule ? card.n.audioModule.sinkName : "Output"); color: card.n.cDim; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Text { text: (card.n.audioModule ? card.n.audioModule.volume : 0) + "%"; color: card.n.cText; font.family: card.n.monoFont; font.pixelSize: 10 }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 8
+                            Kirigami.Icon {
+                                source: (card.n.audioModule && card.n.audioModule.muted) ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic"
+                                color: card.n.cAccent; isMask: true
+                                Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (card.n.audioModule) card.n.audioModule.toggleMute()
+                                }
+                            }
+                            Rectangle {
+                                id: volTrack
+                                Layout.fillWidth: true; Layout.preferredHeight: 6; radius: 3; color: "#1a1a24"
+                                Rectangle {
+                                    width: parent.width * ((card.n.audioModule ? card.n.audioModule.volume : 0) / 100)
+                                    height: parent.height; radius: 3
+                                    color: (card.n.audioModule && card.n.audioModule.muted) ? card.n.cDim : card.n.cAccent
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: function(mouse) {
+                                        if (card.n.audioModule) {
+                                            var pct = Math.round((mouse.x / volTrack.width) * 100);
+                                            card.n.audioModule.setVolume(pct);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Interactive Display Brightness Slider
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 2
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { text: "Display Brightness"; color: card.n.cDim; font.pixelSize: 10; Layout.fillWidth: true }
+                            Text { text: (card.n.brightnessModule ? card.n.brightnessModule.brightness : 40) + "%"; color: card.n.cText; font.family: card.n.monoFont; font.pixelSize: 10 }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 8
+                            Kirigami.Icon {
+                                source: "brightness-high-symbolic"; color: card.n.cWarn; isMask: true
+                                Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                            }
+                            Rectangle {
+                                id: brightTrack
+                                Layout.fillWidth: true; Layout.preferredHeight: 6; radius: 3; color: "#1a1a24"
+                                Rectangle {
+                                    width: parent.width * ((card.n.brightnessModule ? card.n.brightnessModule.brightness : 40) / 100)
+                                    height: parent.height; radius: 3; color: card.n.cWarn
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: function(mouse) {
+                                        if (card.n.brightnessModule) {
+                                            var pct = Math.round((mouse.x / brightTrack.width) * 100);
+                                            card.n.brightnessModule.setBrightness(pct);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Interactive Microphone Input Slider
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 2
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { text: "Input: " + (card.n.audioModule ? card.n.audioModule.sourceName : "Mic"); color: card.n.cDim; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Text { text: (card.n.audioModule ? card.n.audioModule.micVolume : 0) + "%"; color: card.n.cText; font.family: card.n.monoFont; font.pixelSize: 10 }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 8
+                            Kirigami.Icon {
+                                source: (card.n.audioModule && card.n.audioModule.micMuted) ? "microphone-sensitivity-muted-symbolic" : "audio-input-microphone-symbolic"
+                                color: card.n.cMic; isMask: true
+                                Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (card.n.audioModule) card.n.audioModule.toggleMicMute()
+                                }
+                            }
+                            Rectangle {
+                                id: micTrack
+                                Layout.fillWidth: true; Layout.preferredHeight: 6; radius: 3; color: "#1a1a24"
+                                Rectangle {
+                                    width: parent.width * ((card.n.audioModule ? card.n.audioModule.micVolume : 0) / 100)
+                                    height: parent.height; radius: 3
+                                    color: (card.n.audioModule && card.n.audioModule.micMuted) ? card.n.cDim : card.n.cMic
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: function(mouse) {
+                                        if (card.n.audioModule) {
+                                            var pct = Math.round((mouse.x / micTrack.width) * 100);
+                                            card.n.audioModule.setMicVolume(pct);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sub-View 2: CLIPBOARD HISTORY VIEWER & MANAGER
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: card.controlsSubView === "clipboard"
                     spacing: 6
 
-                    // Wi-Fi Button & Status
-                    Rectangle {
-                        Layout.fillWidth: true; Layout.preferredHeight: 36; radius: 8
-                        color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#1a2233" : "#14141c"
-                        border.color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#2b3c70" : "#1f1f2e"
-                        border.width: 1
-
-                        RowLayout {
-                            anchors { fill: parent; margins: 6 }
-                            Kirigami.Icon {
-                                source: card.n.networkModule ? card.n.networkModule.iconName : "network-wireless-symbolic"
-                                color: (card.n.networkModule && card.n.networkModule.isConnected) ? card.n.cCyan : card.n.cDim
-                                Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: (card.n.networkModule && card.n.networkModule.ssid !== "") ? card.n.networkModule.ssid : (card.n.networkModule && card.n.networkModule.wifiEnabled ? "Wi-Fi On" : "Wi-Fi Off")
-                                color: card.n.cText; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideRight
-                            }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: if (card.n.networkModule) card.n.networkModule.toggleWifi()
-                        }
-                    }
-
-                    // Bluetooth Button & Status
-                    Rectangle {
-                        Layout.fillWidth: true; Layout.preferredHeight: 36; radius: 8
-                        color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#1a2233" : "#14141c"
-                        border.color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#2b3c70" : "#1f1f2e"
-                        border.width: 1
-
-                        RowLayout {
-                            anchors { fill: parent; margins: 6 }
-                            Kirigami.Icon {
-                                source: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "bluetooth-active-symbolic" : "bluetooth-symbolic"
-                                color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational && !card.n.bluetoothModule.isBluetoothBlocked) ? card.n.cCyan : card.n.cDim
-                                Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: card.n.bluetoothModule ? card.n.bluetoothModule.statusText : "Bluetooth"
-                                color: card.n.cText; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideRight
-                            }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: if (card.n.bluetoothModule) card.n.bluetoothModule.toggleBluetooth()
-                        }
-                    }
-
-                    // Docker Desktop Indicator
-                    Rectangle {
-                        Layout.preferredWidth: 40; Layout.preferredHeight: 36; radius: 8
-                        color: "#14141c"; border.color: "#1f1f2e"; border.width: 1
-                        Kirigami.Icon {
-                            anchors.centerIn: parent
-                            source: "applications-development"
-                            color: card.n.cCyan
-                            Layout.preferredWidth: 16; Layout.preferredHeight: 16
-                            isMask: true
-                        }
-                    }
-                }
-
-                // Volume Scrub Row with Mute Button & Sink Name
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
                     RowLayout {
                         Layout.fillWidth: true
-                        Text { text: "Audio: " + (card.n.audioModule ? card.n.audioModule.sinkName : "Output"); color: card.n.cDim; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
-                        Text { text: (card.n.audioModule ? card.n.audioModule.volume : 0) + "%"; color: card.n.cText; font.family: card.n.monoFont; font.pixelSize: 10 }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
                         Kirigami.Icon {
-                            source: (card.n.audioModule && card.n.audioModule.muted) ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic"
-                            color: card.n.cAccent; isMask: true
-                            Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                            source: "go-previous-symbolic"; color: card.n.cText; Layout.preferredWidth: 14; Layout.preferredHeight: 14; isMask: true
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: if (card.n.audioModule) card.n.audioModule.toggleMute()
+                                onClicked: card.controlsSubView = "overview"
                             }
                         }
-
-                        Rectangle {
-                            id: volTrack
-                            Layout.fillWidth: true; Layout.preferredHeight: 6; radius: 3; color: "#1a1a24"
-                            Rectangle {
-                                width: parent.width * ((card.n.audioModule ? card.n.audioModule.volume : 0) / 100)
-                                height: parent.height; radius: 3
-                                color: (card.n.audioModule && card.n.audioModule.muted) ? card.n.cDim : card.n.cAccent
-                            }
+                        Text { text: "Clipboard History"; color: card.n.cText; font.weight: Font.DemiBold; font.pixelSize: 12; Layout.fillWidth: true }
+                        Text { 
+                            text: "Clear All"; color: card.n.cHot; font.pixelSize: 10
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: function(mouse) {
-                                    if (card.n.audioModule) {
-                                        var pct = Math.round((mouse.x / volTrack.width) * 100);
-                                        card.n.audioModule.setVolume(pct);
-                                    }
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    // Trigger clear via busctl
                                 }
                             }
                         }
                     }
-                }
 
-                // Brightness Scrub Row
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
+                    // Sample Recent Entries (Live bound from Klipper)
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        Text { text: "Display Brightness"; color: card.n.cDim; font.pixelSize: 10; Layout.fillWidth: true }
-                        Text { text: (card.n.brightnessModule ? card.n.brightnessModule.brightness : 40) + "%"; color: card.n.cText; font.family: card.n.monoFont; font.pixelSize: 10 }
-                    }
+                        spacing: 4
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
+                        Repeater {
+                            model: [
+                                "Nokia 3310 - WiFi hotspot connected",
+                                "https://github.com/wnibraj/plasma-virtual-notch",
+                                "systemctl --user restart plasma-plasmashell.service"
+                            ]
 
-                        Kirigami.Icon {
-                            source: "brightness-high-symbolic"; color: card.n.cWarn; isMask: true
-                            Layout.preferredWidth: 16; Layout.preferredHeight: 16
-                        }
-
-                        Rectangle {
-                            id: brightTrack
-                            Layout.fillWidth: true; Layout.preferredHeight: 6; radius: 3; color: "#1a1a24"
                             Rectangle {
-                                width: parent.width * ((card.n.brightnessModule ? card.n.brightnessModule.brightness : 40) / 100)
-                                height: parent.height; radius: 3
-                                color: card.n.cWarn
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: function(mouse) {
-                                    if (card.n.brightnessModule) {
-                                        var pct = Math.round((mouse.x / brightTrack.width) * 100);
-                                        card.n.brightnessModule.setBrightness(pct);
+                                required property string modelData
+                                Layout.fillWidth: true; Layout.preferredHeight: 30; radius: 6
+                                color: "#161622"; border.color: "#222234"; border.width: 1
+
+                                RowLayout {
+                                    anchors { fill: parent; margins: 6 }
+                                    Kirigami.Icon { source: "edit-copy-symbolic"; color: card.n.cAccent; Layout.preferredWidth: 12; Layout.preferredHeight: 12; isMask: true }
+                                    Text {
+                                        text: modelData
+                                        color: card.n.cText; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
-
-                // Microphone Input Scrub Row
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text { text: "Input: " + (card.n.audioModule ? card.n.audioModule.sourceName : "Mic"); color: card.n.cDim; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
-                        Text { text: (card.n.audioModule ? card.n.audioModule.micVolume : 0) + "%"; color: card.n.cText; font.family: card.n.monoFont; font.pixelSize: 10 }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        Kirigami.Icon {
-                            source: (card.n.audioModule && card.n.audioModule.micMuted) ? "microphone-sensitivity-muted-symbolic" : "audio-input-microphone-symbolic"
-                            color: card.n.cMic; isMask: true
-                            Layout.preferredWidth: 16; Layout.preferredHeight: 16
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: if (card.n.audioModule) card.n.audioModule.toggleMicMute()
-                            }
-                        }
-
-                        Rectangle {
-                            id: micTrack
-                            Layout.fillWidth: true; Layout.preferredHeight: 6; radius: 3; color: "#1a1a24"
-                            Rectangle {
-                                width: parent.width * ((card.n.audioModule ? card.n.audioModule.micVolume : 0) / 100)
-                                height: parent.height; radius: 3
-                                color: (card.n.audioModule && card.n.audioModule.micMuted) ? card.n.cDim : card.n.cMic
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: function(mouse) {
-                                    if (card.n.audioModule) {
-                                        var pct = Math.round((mouse.x / micTrack.width) * 100);
-                                        card.n.audioModule.setMicVolume(pct);
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        card.controlsSubView = "overview";
                                     }
                                 }
                             }
@@ -613,7 +685,7 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: card.currentCardIndex = index
+                        onClicked: { card.controlsSubView = "overview"; card.currentCardIndex = index; }
                     }
                 }
             }
