@@ -3,7 +3,7 @@ import org.kde.notificationmanager as NotificationManager
 
 /*
  * NotificationModule.qml
- * Integrates with KDE Plasma Notification Manager to display alerts in Dynamic Island.
+ * Integrates with KDE Plasma Notification Manager (Plasma 6 native type: Notifications)
  */
 BaseModule {
     id: notifyMod
@@ -11,11 +11,10 @@ BaseModule {
     priority: 3
     preferredAccentColor: host ? host.cCyan : "#5cf2ff"
 
-    NotificationManager.NotificationsModel {
+    NotificationManager.Notifications {
         id: notificationsModel
         showJobs: false
         showNotifications: true
-        blacklistedApplications: []
     }
 
     readonly property int count: notificationsModel.count
