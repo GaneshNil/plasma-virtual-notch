@@ -18,3 +18,4 @@ ConfigModel {
         source: "configModules.qml"
     }
 }
+

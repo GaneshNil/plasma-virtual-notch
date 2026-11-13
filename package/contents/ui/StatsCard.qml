@@ -15,9 +15,9 @@ Item {
     Layout.minimumWidth: implicitWidth
     Layout.minimumHeight: implicitHeight
 
-    // Active sliding card view: 0 = Stats, 1 = Media, 2 = Controls
+    // Active sliding card view: 0 = Stats, 1 = Media, 2 = Controls, 3 = Wallpapers
     property int currentCardIndex: 0
-    readonly property int totalCards: 3
+    readonly property int totalCards: 4
 
     // Sub-view in Controls tab: "overview", "clipboard", "notifications"
     property string controlsSubView: "overview"
@@ -184,7 +184,8 @@ Item {
                     model: [
                         { name: "Stats", icon: "utilities-system-monitor-symbolic" },
                         { name: "Media", icon: "media-playback-start-symbolic" },
-                        { name: "Controls", icon: "preferences-system-symbolic" }
+                        { name: "Controls", icon: "preferences-system-symbolic" },
+                        { name: "Wallpapers", icon: "preferences-desktop-wallpaper-symbolic" }
                     ]
 
                     Rectangle {
@@ -236,7 +237,8 @@ Item {
             Layout.preferredHeight: {
                 if (card.currentCardIndex === 0) return statsSection.implicitHeight;
                 if (card.currentCardIndex === 1) return mediaSection.implicitHeight;
-                return controlsSection.implicitHeight;
+                if (card.currentCardIndex === 2) return controlsSection.implicitHeight;
+                return wallpaperSection.implicitHeight;
             }
             clip: true
 
@@ -380,7 +382,7 @@ Item {
                 width: parent.width
                 opacity: card.currentCardIndex === 2 ? 1 : 0
                 visible: opacity > 0
-                x: card.currentCardIndex === 2 ? 0 : container.width
+                x: card.currentCardIndex === 2 ? 0 : (card.currentCardIndex < 2 ? container.width : -container.width)
                 Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
                 Behavior on opacity { NumberAnimation { duration: 200 } }
                 spacing: 8
@@ -500,6 +502,27 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: if (card.n.powerModule) card.n.powerModule.cycleProfile()
+                            }
+                        }
+
+                        // Wallpaper Gallery Button
+                        Rectangle {
+                            Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8
+                            color: "#181824"; border.color: "#28283c"; border.width: 1
+
+                            Kirigami.Icon {
+                                anchors.centerIn: parent
+                                source: "preferences-desktop-wallpaper-symbolic"
+                                color: card.n.cAccent; Layout.preferredWidth: 18; Layout.preferredHeight: 18; isMask: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    card.controlsSubView = "overview";
+                                    card.currentCardIndex = 3;
+                                }
                             }
                         }
                     }
@@ -733,6 +756,18 @@ Item {
                     }
                 }
             }
+
+            // ----------------- CARD 3: WALLPAPER ISLAND GALLERY -----------------
+            WallpaperCard {
+                id: wallpaperSection
+                n: card.n
+                width: parent.width
+                opacity: card.currentCardIndex === 3 ? 1 : 0
+                visible: opacity > 0
+                x: card.currentCardIndex === 3 ? 0 : container.width
+                Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+            }
         }
 
         // =====================================================================
@@ -743,7 +778,7 @@ Item {
             spacing: 6
 
             Repeater {
-                model: 3
+                model: card.totalCards
                 Rectangle {
                     required property int index
                     width: card.currentCardIndex === index ? 16 : 6

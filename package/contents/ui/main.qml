@@ -283,10 +283,17 @@ PlasmoidItem {
     // =====================================================================
     //  LayerShell Overlay Window
     // =====================================================================
+    readonly property int configActiveTab: Plasmoid.configuration.activeTab !== undefined ? Plasmoid.configuration.activeTab : -1
+    onConfigActiveTabChanged: {
+        if (configActiveTab >= 0 && islandWidget && islandWidget.cardContent) {
+            islandWidget.cardContent.currentCardIndex = configActiveTab;
+        }
+    }
+
     Window {
         id: overlay
-        width: root.cardW + 2 * root.fillet + 80
-        height: 520
+        width: Math.max(root.cardW + 2 * root.fillet + 80, 600)
+        height: 540
         color: "transparent"
         flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | (root.open ? 0 : Qt.WindowTransparentForInput)
         visible: true
@@ -294,7 +301,7 @@ PlasmoidItem {
         LayerShell.Window.layer: LayerShell.Window.LayerTop
         LayerShell.Window.anchors: LayerShell.Window.AnchorTop
         LayerShell.Window.exclusionZone: -1
-        LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
+        LayerShell.Window.keyboardInteractivity: root.open ? LayerShell.Window.KeyboardInteractivityOnDemand : LayerShell.Window.KeyboardInteractivityNone
         LayerShell.Window.activateOnShow: false
         LayerShell.Window.scope: "virtual-notch"
 
@@ -318,6 +325,7 @@ PlasmoidItem {
         }
 
         Island {
+            id: islandWidget
             n: root
             anchors.horizontalCenter: parent.horizontalCenter
         }

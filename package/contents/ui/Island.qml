@@ -7,6 +7,7 @@ import org.kde.kirigami as Kirigami
 Item {
     id: island
     property var n // Host PlasmoidItem in main.qml
+    property alias cardContent: cardContent
 
     // State definitions
     // 0 = Compact, 1 = Expanded (open card), 2 = Activity (dynamic event pulse)
@@ -23,7 +24,10 @@ Item {
 
     // Dynamic width & height morphing based on active state
     property int targetWidth: {
-        if (isExpanded) return n.cardW;
+        if (isExpanded) {
+            if (cardContent && cardContent.currentCardIndex === 3) return Math.min(Screen.width - 80, 560);
+            return n.cardW;
+        }
         if (isActivity) return Math.min(n.cardW - 40, n.notchW + 80);
         return n.notchW + (n.micActive ? 30 : 0);
     }
@@ -245,7 +249,8 @@ Item {
         StatsCard {
             id: cardContent
             n: island.n
-            width: n.cardW
+            width: (island.isExpanded && cardContent.currentCardIndex === 3) ? Math.min(Screen.width - 80, 560) : n.cardW
+            Behavior on width { NumberAnimation { duration: 380; easing.type: Easing.OutBack; easing.overshoot: 0.85 } }
             anchors.horizontalCenter: parent.horizontalCenter
             y: 0
             opacity: island.isExpanded ? 1 : 0
