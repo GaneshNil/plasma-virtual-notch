@@ -3,7 +3,7 @@ import org.kde.plasma.private.volume as Vol
 
 /*
  * AudioModule.qml
- * Full PipeWire master volume & microphone controller with sink/source access.
+ * Full PipeWire master volume & microphone controller using official Plasma-PA PreferredDevice singleton.
  */
 BaseModule {
     id: audioMod
@@ -11,19 +11,16 @@ BaseModule {
     priority: 2
     preferredAccentColor: host ? host.cAccent : "#c77dff"
 
-    Vol.SinkModel { id: sinkModel }
-    Vol.SourceModel { id: sourceModel }
-
-    readonly property var preferredSink: sinkModel.preferredSink
-    readonly property var preferredSource: sourceModel.defaultSource
+    readonly property var preferredSink: Vol.PreferredDevice.sink
+    readonly property var preferredSource: Vol.PreferredDevice.source
 
     readonly property int volume: preferredSink ? Math.round(preferredSink.volume / 655.36) : 0
     readonly property bool muted: preferredSink ? preferredSink.muted : false
-    readonly property string sinkName: preferredSink ? (preferredSink.description || preferredSink.name || "Output") : "Default Audio"
+    readonly property string sinkName: preferredSink ? (preferredSink.description || preferredSink.name || "Built-in Audio") : "Built-in Audio"
 
     readonly property int micVolume: preferredSource ? Math.round(preferredSource.volume / 655.36) : 0
     readonly property bool micMuted: preferredSource ? preferredSource.muted : false
-    readonly property string sourceName: preferredSource ? (preferredSource.description || preferredSource.name || "Input") : "Default Mic"
+    readonly property string sourceName: preferredSource ? (preferredSource.description || preferredSource.name || "Built-in Mic") : "Built-in Mic"
 
     function toggleMute() {
         if (preferredSink) preferredSink.muted = !preferredSink.muted;

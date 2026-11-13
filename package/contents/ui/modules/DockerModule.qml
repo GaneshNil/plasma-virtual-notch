@@ -13,3 +13,4 @@ BaseModule {
     property bool isRunning: true
     property string statusText: "Docker Desktop Running"
 }
+

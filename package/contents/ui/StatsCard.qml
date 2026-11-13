@@ -19,7 +19,7 @@ Item {
     property int currentCardIndex: 0
     readonly property int totalCards: 3
 
-    // Sub-view in Controls tab: "overview", "wifi_list", "clipboard", "calendar"
+    // Sub-view in Controls tab: "overview", "clipboard", "notifications"
     property string controlsSubView: "overview"
 
     // Focus management for keyboard navigation
@@ -242,7 +242,6 @@ Item {
 
             Behavior on Layout.preferredHeight { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
-            // Mouse / Touch Gesture handler for left/right swipe
             MouseArea {
                 anchors.fill: parent
                 property real startX: 0
@@ -392,12 +391,12 @@ Item {
                     visible: card.controlsSubView === "overview"
                     spacing: 8
 
-                    // Primary Quick Toggles (Wi-Fi, Bluetooth, Clipboard, Docker)
+                    // Primary Quick Toggles (Wi-Fi, Bluetooth, Clipboard, Notifications, Power Profile)
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        // Wi-Fi Tile (Click to toggle, double-click/long to view APs)
+                        // Wi-Fi Tile
                         Rectangle {
                             Layout.fillWidth: true; Layout.preferredHeight: 38; radius: 8
                             color: (card.n.networkModule && card.n.networkModule.wifiEnabled) ? "#1a2233" : "#14141c"
@@ -451,14 +450,14 @@ Item {
                             }
                         }
 
-                        // Clipboard History Button
+                        // Clipboard History Button with Icon
                         Rectangle {
                             Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8
                             color: "#181824"; border.color: "#28283c"; border.width: 1
                             Kirigami.Icon {
                                 anchors.centerIn: parent
-                                source: "klipper"
-                                color: card.n.cAccent; Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                                source: "edit-paste-symbolic"
+                                color: card.n.cAccent; Layout.preferredWidth: 18; Layout.preferredHeight: 18; isMask: true
                             }
                             MouseArea {
                                 anchors.fill: parent
@@ -467,14 +466,40 @@ Item {
                             }
                         }
 
-                        // Docker Desktop Status Tile
+                        // Notifications Panel Button with Icon
                         Rectangle {
                             Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8
-                            color: "#14141c"; border.color: "#1f1f2e"; border.width: 1
+                            color: "#181824"; border.color: "#28283c"; border.width: 1
                             Kirigami.Icon {
                                 anchors.centerIn: parent
-                                source: "applications-development"
-                                color: card.n.cCyan; Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                                source: "notifications-symbolic"
+                                color: card.n.cCyan; Layout.preferredWidth: 18; Layout.preferredHeight: 18; isMask: true
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: card.controlsSubView = "notifications"
+                            }
+                        }
+
+                        // Power Profile Button (Power Saver / Balanced / Performance)
+                        Rectangle {
+                            Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8
+                            color: (card.n.powerModule && card.n.powerModule.currentProfile === "performance") ? "#381a24" : ((card.n.powerModule && card.n.powerModule.currentProfile === "power-saver") ? "#16281e" : "#1a2233")
+                            border.color: (card.n.powerModule && card.n.powerModule.currentProfile === "performance") ? "#702b3c" : ((card.n.powerModule && card.n.powerModule.currentProfile === "power-saver") ? "#225533" : "#2b3c70")
+                            border.width: 1
+
+                            Kirigami.Icon {
+                                anchors.centerIn: parent
+                                source: (card.n.powerModule && card.n.powerModule.currentProfile === "performance") ? "speedometer-symbolic" : ((card.n.powerModule && card.n.powerModule.currentProfile === "power-saver") ? "battery-profile-powersave-symbolic" : "battery-profile-balanced-symbolic")
+                                color: (card.n.powerModule && card.n.powerModule.currentProfile === "performance") ? card.n.cHot : ((card.n.powerModule && card.n.powerModule.currentProfile === "power-saver") ? card.n.cGood : card.n.cCyan)
+                                Layout.preferredWidth: 18; Layout.preferredHeight: 18; isMask: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (card.n.powerModule) card.n.powerModule.cycleProfile()
                             }
                         }
                     }
@@ -520,7 +545,7 @@ Item {
                         }
                     }
 
-                    // Interactive Display Brightness Slider
+                    // Interactive Display Brightness Slider (Fixed & Responsive)
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 2
                         RowLayout {
@@ -596,7 +621,7 @@ Item {
                     }
                 }
 
-                // Sub-View 2: CLIPBOARD HISTORY VIEWER & MANAGER
+                // Sub-View 2: CLIPBOARD HISTORY VIEWER & WORKING CLEAR ALL
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: card.controlsSubView === "clipboard"
@@ -614,28 +639,24 @@ Item {
                         }
                         Text { text: "Clipboard History"; color: card.n.cText; font.weight: Font.DemiBold; font.pixelSize: 12; Layout.fillWidth: true }
                         Text { 
-                            text: "Clear All"; color: card.n.cHot; font.pixelSize: 10
+                            text: "Clear All"; color: card.n.cHot; font.pixelSize: 10; font.weight: Font.DemiBold
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    // Trigger clear via busctl
+                                    if (card.n.backendBridge) card.n.backendBridge.clearClipboard();
+                                    card.controlsSubView = "overview";
                                 }
                             }
                         }
                     }
 
-                    // Sample Recent Entries (Live bound from Klipper)
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 4
 
                         Repeater {
-                            model: [
-                                "Nokia 3310 - WiFi hotspot connected",
-                                "https://github.com/wnibraj/plasma-virtual-notch",
-                                "systemctl --user restart plasma-plasmashell.service"
-                            ]
+                            model: (card.n.backendBridge && card.n.backendBridge.clipboardHistory.length > 0) ? card.n.backendBridge.clipboardHistory : ["(Clipboard is empty)"]
 
                             Rectangle {
                                 required property string modelData
@@ -654,8 +675,58 @@ Item {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
+                                        if (modelData !== "(Clipboard is empty)" && card.n.backendBridge) {
+                                            card.n.backendBridge.copyClipboard(modelData);
+                                        }
                                         card.controlsSubView = "overview";
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sub-View 3: NOTIFICATIONS PANEL
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: card.controlsSubView === "notifications"
+                    spacing: 6
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Kirigami.Icon {
+                            source: "go-previous-symbolic"; color: card.n.cText; Layout.preferredWidth: 14; Layout.preferredHeight: 14; isMask: true
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: card.controlsSubView = "overview"
+                            }
+                        }
+                        Text { text: "Notifications"; color: card.n.cText; font.weight: Font.DemiBold; font.pixelSize: 12; Layout.fillWidth: true }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Repeater {
+                            model: (card.n.notificationModule && card.n.notificationModule.getRecentNotifications().length > 0) ? card.n.notificationModule.getRecentNotifications() : [
+                                { app: "System", summary: "No Recent Notifications", body: "You are all caught up!" }
+                            ]
+
+                            Rectangle {
+                                required property var modelData
+                                Layout.fillWidth: true; Layout.preferredHeight: 40; radius: 6
+                                color: "#161622"; border.color: "#222234"; border.width: 1
+
+                                ColumnLayout {
+                                    anchors { fill: parent; margins: 6 }
+                                    spacing: 0
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { text: modelData.app; color: card.n.cCyan; font.pixelSize: 9; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                                    }
+                                    Text { text: modelData.summary; color: card.n.cText; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
                                 }
                             }
                         }

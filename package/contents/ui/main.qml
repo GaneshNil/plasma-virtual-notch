@@ -33,6 +33,8 @@ PlasmoidItem {
     readonly property Modules.BluetoothModule bluetoothModule: Modules.BluetoothModule { host: root; moduleEnabled: root.enableBluetooth }
     readonly property Modules.BatteryModule batteryModule: Modules.BatteryModule { host: root; moduleEnabled: root.enableBattery }
     readonly property Modules.BrightnessModule brightnessModule: Modules.BrightnessModule { host: root; moduleEnabled: true }
+    readonly property Modules.PowerProfileModule powerModule: Modules.PowerProfileModule { host: root; moduleEnabled: true }
+    readonly property Components.BackendBridge backendBridge: Components.BackendBridge {}
     readonly property Modules.DockerModule dockerModule: Modules.DockerModule { host: root; moduleEnabled: true }
 
     // ---------- Event Queue & State Arbiter ----------

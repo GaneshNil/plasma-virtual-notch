@@ -3,7 +3,7 @@ import org.kde.notificationmanager as NotificationManager
 
 /*
  * NotificationModule.qml
- * Integrates with KDE Plasma Notification Manager (Plasma 6 native type: Notifications)
+ * Full two-way KDE Plasma Notification integration.
  */
 BaseModule {
     id: notifyMod
@@ -31,5 +31,18 @@ BaseModule {
             var text = summary + (body ? ": " + body : "");
             host.eventQueue.postEvent("notifications", text, 3, 4500, notifyMod.preferredAccentColor);
         }
+    }
+
+    function getRecentNotifications() {
+        var items = [];
+        var maxItems = Math.min(notificationsModel.count, 6);
+        for (var i = 0; i < maxItems; i++) {
+            var idx = notificationsModel.index(i, 0);
+            var summary = notificationsModel.data(idx, NotificationManager.Notifications.SummaryRole) || "Notification";
+            var body = notificationsModel.data(idx, NotificationManager.Notifications.BodyRole) || "";
+            var app = notificationsModel.data(idx, NotificationManager.Notifications.ApplicationNameRole) || "System";
+            items.push({ id: i, summary: summary, body: body, app: app });
+        }
+        return items;
     }
 }

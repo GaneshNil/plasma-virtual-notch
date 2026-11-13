@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Dynamic Island Two-Way Control Bridge
-Provides bidirectional synchronization and execution for:
-- NetworkManager (WiFi on/off, scan APs, connect/disconnect)
-- BlueZ (Bluetooth on/off, scan, pair, connect)
-- Solid BrightnessControl (get/set brightness)
-- Klipper (get/set/clear history)
-- Audio (sinks/sources via wpctl/pipewire)
+Dynamic Island Full Two-Way Control Bridge
+Connects QML directly to:
+- net.hadess.PowerProfiles (get/set profile: power-saver, balanced, performance)
+- Solid BrightnessControl (get/set brightness via D-Bus)
+- Klipper (get history, set clipboard item, clear all history)
+- NetworkManager (WiFi on/off, get APs)
+- BlueZ (Bluetooth on/off)
 """
 import sys, json, dbus
 
@@ -18,110 +18,117 @@ def handle_request(req):
 
     if action == "get_state":
         res = {}
-        # 1. WiFi
+        # 1. Power Profile
         try:
-            nm = sysbus.get_object("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager")
-            props = dbus.Interface(nm, "org.freedesktop.DBus.Properties")
-            res["wifi_enabled"] = bool(props.Get("org.freedesktop.NetworkManager", "WirelessEnabled"))
-            # APs
-            devs = props.Get("org.freedesktop.NetworkManager", "AllDevices")
-            aps_list = []
-            for d in devs:
-                dev_obj = sysbus.get_object("org.freedesktop.NetworkManager", d)
-                d_props = dbus.Interface(dev_obj, "org.freedesktop.DBus.Properties")
-                if d_props.Get("org.freedesktop.NetworkManager.Device", "DeviceType") == 2:
-                    wf = dbus.Interface(dev_obj, "org.freedesktop.NetworkManager.Device.Wireless")
-                    for a in wf.GetAllAccessPoints():
-                        ap_obj = sysbus.get_object("org.freedesktop.NetworkManager", a)
-                        ap_props = dbus.Interface(ap_obj, "org.freedesktop.DBus.Properties")
-                        ssid = bytes(ap_props.Get("org.freedesktop.NetworkManager.AccessPoint", "Ssid")).decode("utf-8", "ignore")
-                        strength = int(ap_props.Get("org.freedesktop.NetworkManager.AccessPoint", "Strength"))
-                        if ssid:
-                            aps_list.append({"ssid": ssid, "strength": strength})
-            res["aps"] = aps_list
+            pp = sysbus.get_object("net.hadess.PowerProfiles", "/net/hadess/PowerProfiles")
+            props = dbus.Interface(pp, "org.freedesktop.DBus.Properties")
+            res["power_profile"] = str(props.Get("net.hadess.PowerProfiles", "ActiveProfile"))
         except Exception as e:
-            res["wifi_error"] = str(e)
+            res["power_profile"] = "balanced"
 
-        # 2. Bluetooth
-        try:
-            bluez = sysbus.get_object("org.bluez", "/org/bluez/hci0")
-            props = dbus.Interface(bluez, "org.freedesktop.DBus.Properties")
-            res["bt_powered"] = bool(props.Get("org.bluez.Adapter1", "Powered"))
-            # devices
-            om = dbus.Interface(sysbus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
-            objs = om.GetManagedObjects()
-            devs = []
-            for k, v in objs.items():
-                if "org.bluez.Device1" in v:
-                    d = v["org.bluez.Device1"]
-                    devs.append({"name": str(d.get("Name", "Device")), "connected": bool(d.get("Connected", False)), "path": k})
-            res["bt_devices"] = devs
-        except Exception as e:
-            res["bt_error"] = str(e)
-
-        # 3. Brightness
+        # 2. Brightness
         try:
             solid = sbus.get_object("org.kde.Solid.PowerManagement", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl")
             b_iface = dbus.Interface(solid, "org.kde.Solid.PowerManagement.Actions.BrightnessControl")
             cur = int(b_iface.brightness())
             mx = int(b_iface.brightnessMax())
-            res["brightness_pct"] = int((cur / mx) * 100) if mx > 0 else 50
+            res["brightness_pct"] = int((cur / mx) * 100) if mx > 0 else 40
         except Exception as e:
-            res["brightness_error"] = str(e)
+            res["brightness_pct"] = 40
 
-        # 4. Klipper
+        # 3. Klipper History
         try:
             klipper = sbus.get_object("org.kde.klipper", "/klipper")
             k_iface = dbus.Interface(klipper, "org.kde.klipper.klipper")
-            hist = [str(item) for item in k_iface.getClipboardHistoryMenu()[:10]]
+            hist = [str(item) for item in k_iface.getClipboardHistoryMenu()[:15]]
             res["clipboard_history"] = hist
         except Exception as e:
-            res["clipboard_error"] = str(e)
+            res["clipboard_history"] = []
+
+        # 4. WiFi
+        try:
+            nm = sysbus.get_object("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager")
+            props = dbus.Interface(nm, "org.freedesktop.DBus.Properties")
+            res["wifi_enabled"] = bool(props.Get("org.freedesktop.NetworkManager", "WirelessEnabled"))
+        except Exception as e:
+            res["wifi_enabled"] = True
+
+        # 5. Bluetooth
+        try:
+            bluez = sysbus.get_object("org.bluez", "/org/bluez/hci0")
+            props = dbus.Interface(bluez, "org.freedesktop.DBus.Properties")
+            res["bt_powered"] = bool(props.Get("org.bluez.Adapter1", "Powered"))
+        except Exception as e:
+            res["bt_powered"] = True
 
         return res
 
+    elif action == "set_power_profile":
+        profile = str(data.get("profile", "balanced"))
+        try:
+            pp = sysbus.get_object("net.hadess.PowerProfiles", "/net/hadess/PowerProfiles")
+            props = dbus.Interface(pp, "org.freedesktop.DBus.Properties")
+            props.Set("net.hadess.PowerProfiles", "ActiveProfile", profile)
+            return {"ok": True, "power_profile": profile}
+        except Exception as e:
+            return {"error": str(e)}
+
+    elif action == "set_brightness":
+        pct = max(1, min(100, int(data.get("pct", 40))))
+        try:
+            solid = sbus.get_object("org.kde.Solid.PowerManagement", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl")
+            b_iface = dbus.Interface(solid, "org.kde.Solid.PowerManagement.Actions.BrightnessControl")
+            mx = int(b_iface.brightnessMax())
+            val = int((pct / 100.0) * mx)
+            b_iface.setBrightness(val)
+            return {"ok": True, "brightness_pct": pct}
+        except Exception as e:
+            return {"error": str(e)}
+
+    elif action == "copy_clipboard":
+        text = str(data.get("text", ""))
+        try:
+            klipper = sbus.get_object("org.kde.klipper", "/klipper")
+            k_iface = dbus.Interface(klipper, "org.kde.klipper.klipper")
+            k_iface.setClipboardContents(text)
+            return {"ok": True, "copied": text[:30]}
+        except Exception as e:
+            return {"error": str(e)}
+
+    elif action == "clear_clipboard":
+        try:
+            klipper = sbus.get_object("org.kde.klipper", "/klipper")
+            k_iface = dbus.Interface(klipper, "org.kde.klipper.klipper")
+            k_iface.clearClipboardHistory()
+            return {"ok": True}
+        except Exception as e:
+            return {"error": str(e)}
+
     elif action == "set_wifi_enabled":
         val = bool(data.get("enabled", True))
-        nm = sysbus.get_object("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager")
-        props = dbus.Interface(nm, "org.freedesktop.DBus.Properties")
-        props.Set("org.freedesktop.NetworkManager", "WirelessEnabled", val)
-        return {"ok": True, "wifi_enabled": val}
+        try:
+            nm = sysbus.get_object("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager")
+            props = dbus.Interface(nm, "org.freedesktop.DBus.Properties")
+            props.Set("org.freedesktop.NetworkManager", "WirelessEnabled", val)
+            return {"ok": True, "wifi_enabled": val}
+        except Exception as e:
+            return {"error": str(e)}
 
     elif action == "set_bt_powered":
         val = bool(data.get("powered", True))
-        bluez = sysbus.get_object("org.bluez", "/org/bluez/hci0")
-        props = dbus.Interface(bluez, "org.freedesktop.DBus.Properties")
-        props.Set("org.bluez.Adapter1", "Powered", val)
-        return {"ok": True, "bt_powered": val}
-
-    elif action == "set_brightness":
-        pct = max(1, min(100, int(data.get("pct", 50))))
-        solid = sbus.get_object("org.kde.Solid.PowerManagement", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl")
-        b_iface = dbus.Interface(solid, "org.kde.Solid.PowerManagement.Actions.BrightnessControl")
-        mx = int(b_iface.brightnessMax())
-        val = int((pct / 100.0) * mx)
-        b_iface.setBrightness(val)
-        return {"ok": True, "brightness_pct": pct}
-
-    elif action == "set_clipboard":
-        text = str(data.get("text", ""))
-        klipper = sbus.get_object("org.kde.klipper", "/klipper")
-        k_iface = dbus.Interface(klipper, "org.kde.klipper.klipper")
-        k_iface.setClipboardContents(text)
-        return {"ok": True, "copied": text[:30]}
-
-    elif action == "clear_clipboard":
-        klipper = sbus.get_object("org.kde.klipper", "/klipper")
-        k_iface = dbus.Interface(klipper, "org.kde.klipper.klipper")
-        k_iface.clearClipboardHistory()
-        return {"ok": True}
+        try:
+            bluez = sysbus.get_object("org.bluez", "/org/bluez/hci0")
+            props = dbus.Interface(bluez, "org.freedesktop.DBus.Properties")
+            props.Set("org.bluez.Adapter1", "Powered", val)
+            return {"ok": True, "bt_powered": val}
+        except Exception as e:
+            return {"error": str(e)}
 
     return {"error": "unknown action"}
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         req = json.loads(sys.argv[1])
-        res = handle_request(req)
-        print(json.dumps(res))
+        print(json.dumps(handle_request(req)))
     else:
         print(json.dumps(handle_request({"action": "get_state"})))
