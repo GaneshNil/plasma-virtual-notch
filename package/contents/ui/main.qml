@@ -284,7 +284,7 @@ PlasmoidItem {
         width: root.cardW + 2 * root.fillet + 80
         height: 520
         color: "transparent"
-        flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | Qt.WindowTransparentForInput
+        flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus | (root.open ? 0 : Qt.WindowTransparentForInput)
         visible: true
 
         LayerShell.Window.layer: LayerShell.Window.LayerTop

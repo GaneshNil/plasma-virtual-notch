@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import "components" as Components
 
@@ -13,6 +14,9 @@ Item {
     Layout.preferredHeight: implicitHeight
     Layout.minimumWidth: implicitWidth
     Layout.minimumHeight: implicitHeight
+
+    // Active sliding card view: 0 = System Monitor, 1 = Media Player, 2 = Control Center
+    property int currentCardIndex: 0
 
     function fmtUptime(sec) {
         sec = Math.floor(sec);
@@ -78,262 +82,352 @@ Item {
         }
 
         // =====================================================================
-        // System Tray Control Center (Quick Toggles & Status)
+        // Interactive Sliding Category Selector (Swipe / Click Tabs)
         // =====================================================================
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
-
-            // 1. Wi-Fi Status Pill
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 34
-                radius: 8
-                color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#1a2233" : "#14141c"
-                border.color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#2b3c70" : "#1f1f2e"
-                border.width: 1
-
-                RowLayout {
-                    anchors { fill: parent; margins: 6 }
-                    spacing: 6
-                    Kirigami.Icon {
-                        source: card.n.networkModule ? card.n.networkModule.iconName : "network-wireless-symbolic"
-                        color: (card.n.networkModule && card.n.networkModule.isConnected) ? card.n.cCyan : card.n.cDim
-                        Layout.preferredWidth: 16; Layout.preferredHeight: 16
-                        isMask: true
-                    }
-                    Text {
-                        Layout.fillWidth: true
-                        text: (card.n.networkModule && card.n.networkModule.ssid !== "") ? card.n.networkModule.ssid : "Wi-Fi"
-                        color: (card.n.networkModule && card.n.networkModule.isConnected) ? card.n.cText : card.n.cDim
-                        font.pixelSize: 11; font.weight: Font.Medium
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-
-            // 2. Bluetooth Status Pill
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 34
-                radius: 8
-                color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#1a2233" : "#14141c"
-                border.color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#2b3c70" : "#1f1f2e"
-                border.width: 1
-
-                RowLayout {
-                    anchors { fill: parent; margins: 6 }
-                    spacing: 6
-                    Kirigami.Icon {
-                        source: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "bluetooth-active-symbolic" : "bluetooth-symbolic"
-                        color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational) ? card.n.cCyan : card.n.cDim
-                        Layout.preferredWidth: 16; Layout.preferredHeight: 16
-                        isMask: true
-                    }
-                    Text {
-                        Layout.fillWidth: true
-                        text: card.n.bluetoothModule ? card.n.bluetoothModule.statusText : "Bluetooth"
-                        color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational) ? card.n.cText : card.n.cDim
-                        font.pixelSize: 11; font.weight: Font.Medium
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-
-            // 3. Battery Status Pill
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 34
-                radius: 8
-                color: (card.n.batteryModule && card.n.batteryModule.isCharging) ? "#16281e" : "#14141c"
-                border.color: (card.n.batteryModule && card.n.batteryModule.isCharging) ? "#225533" : "#1f1f2e"
-                border.width: 1
-                visible: card.n.hasBattery && card.n.enableBattery
-
-                RowLayout {
-                    anchors { fill: parent; margins: 6 }
-                    spacing: 6
-                    Kirigami.Icon {
-                        source: (card.n.batteryModule && card.n.batteryModule.isCharging) ? "battery-charging-symbolic" : "battery-symbolic"
-                        color: (card.n.v_batPct < 20) ? card.n.cHot : card.n.cGood
-                        Layout.preferredWidth: 16; Layout.preferredHeight: 16
-                        isMask: true
-                    }
-                    Text {
-                        Layout.fillWidth: true
-                        text: Math.round(card.n.v_batPct) + "%" + ((card.n.batteryModule && card.n.batteryModule.isCharging) ? " ⚡" : "")
-                        color: card.n.cText
-                        font.family: card.n.monoFont; font.pixelSize: 11; font.weight: Font.Medium
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-        }
-
-        // MPRIS Media Section with Full Interactive Playback Controls
-        ColumnLayout {
-            Layout.fillWidth: true
-            visible: card.n.enableMedia && (card.n.trackTitle !== "" || (card.n.mediaModule && card.n.mediaModule.hasPlayer))
+            Layout.preferredHeight: 28
             spacing: 6
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.largeSpacing
-
-                // Album Artwork
-                Rectangle {
-                    Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 8; color: "#14141c"; clip: true
-                    Image {
-                        anchors.fill: parent
-                        source: card.n.player && card.n.player.artUrl ? card.n.player.artUrl : ""
-                        fillMode: Image.PreserveAspectCrop; asynchronous: true
-                        sourceSize.width: 76; sourceSize.height: 76
-                    }
-                    Kirigami.Icon {
-                        anchors.centerIn: parent; width: 18; height: 18
-                        visible: !(card.n.player && card.n.player.artUrl)
-                        source: "media-playback-start-symbolic"; color: card.n.cAccent; isMask: true
-                    }
-                }
-
-                // Track & Artist Information
-                ColumnLayout {
-                    Layout.fillWidth: true; spacing: 0
-                    Text { 
-                        Layout.fillWidth: true
-                        text: card.n.trackTitle || "No Media Playing"
-                        color: card.n.cText; font.pixelSize: 12; font.weight: Font.DemiBold; elide: Text.ElideRight 
-                    }
-                    Text { 
-                        Layout.fillWidth: true
-                        text: card.n.trackArtist
-                        color: card.n.cDim; font.pixelSize: 11; elide: Text.ElideRight; visible: text !== "" 
-                    }
-                }
-
-                // Animated Equalizer
-                Equalizer { 
-                    n: card.n; active: card.n.playing && card.visible; opacity: card.n.playing ? 1 : 0.3 
-                }
-            }
-
-            // Interactive Controls Row (Previous, Play/Pause, Next)
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 16
+            Repeater {
+                model: [
+                    { name: "Stats", icon: "utilities-system-monitor-symbolic" },
+                    { name: "Media", icon: "media-playback-start-symbolic" },
+                    { name: "Controls", icon: "preferences-system-symbolic" }
+                ]
 
                 Rectangle {
-                    width: 28; height: 28; radius: 14; color: "#14141c"
-                    Kirigami.Icon { anchors.centerIn: parent; width: 14; height: 14; source: "media-skip-backward-symbolic"; color: card.n.cText; isMask: true }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: if (card.n.mediaModule) card.n.mediaModule.previousTrack()
-                    }
-                }
+                    required property int index
+                    required property var modelData
 
-                Rectangle {
-                    width: 32; height: 32; radius: 16; color: card.n.cPink
-                    Kirigami.Icon { 
-                        anchors.centerIn: parent; width: 16; height: 16
-                        source: card.n.playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic"
-                        color: "#000000"; isMask: true 
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: if (card.n.mediaModule) card.n.mediaModule.playPause()
-                    }
-                }
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 6
+                    color: card.currentCardIndex === index ? "#252538" : "#14141c"
+                    border.color: card.currentCardIndex === index ? card.n.cAccent : "#1a1a24"
+                    border.width: 1
 
-                Rectangle {
-                    width: 28; height: 28; radius: 14; color: "#14141c"
-                    Kirigami.Icon { anchors.centerIn: parent; width: 14; height: 14; source: "media-skip-forward-symbolic"; color: card.n.cText; isMask: true }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: if (card.n.mediaModule) card.n.mediaModule.nextTrack()
-                    }
-                }
-            }
-        }
-
-        // Master Audio Volume Control Row
-        RowLayout {
-            Layout.fillWidth: true
-            visible: card.n.enableAudio && !!card.n.audioModule
-            spacing: Kirigami.Units.mediumSpacing
-
-            Kirigami.Icon {
-                source: (card.n.audioModule && card.n.audioModule.muted) ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic"
-                color: card.n.cAccent; isMask: true
-                Layout.preferredWidth: 16; Layout.preferredHeight: 16
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: if (card.n.audioModule) card.n.audioModule.toggleMute()
-                }
-            }
-
-            Rectangle {
-                id: volTrack
-                Layout.fillWidth: true
-                Layout.preferredHeight: 4
-                radius: 2
-                color: "#1a1a24"
-
-                Rectangle {
-                    width: parent.width * ((card.n.audioModule ? card.n.audioModule.volume : 0) / 100)
-                    height: parent.height
-                    radius: 2
-                    color: (card.n.audioModule && card.n.audioModule.muted) ? card.n.cDim : card.n.cAccent
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: function(mouse) {
-                        if (card.n.audioModule) {
-                            var pct = Math.round((mouse.x / volTrack.width) * 100);
-                            card.n.audioModule.setVolume(pct);
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+                        Kirigami.Icon {
+                            source: modelData.icon
+                            color: card.currentCardIndex === index ? card.n.cAccent : card.n.cDim
+                            Layout.preferredWidth: 14; Layout.preferredHeight: 14
+                            isMask: true
+                        }
+                        Text {
+                            text: modelData.name
+                            color: card.currentCardIndex === index ? card.n.cText : card.n.cDim
+                            font.pixelSize: 11
+                            font.weight: card.currentCardIndex === index ? Font.DemiBold : Font.Normal
                         }
                     }
-                }
-            }
 
-            Text {
-                text: (card.n.audioModule ? card.n.audioModule.volume : 0) + "%"
-                color: card.n.cText
-                font.family: card.n.monoFont; font.pixelSize: 11
-                Layout.preferredWidth: 32
-                horizontalAlignment: Text.AlignRight
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: card.currentCardIndex = index
+                    }
+                }
             }
         }
 
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#1a1a24" }
 
-        // Modular System Monitoring Grid
-        ColumnLayout {
+        // =====================================================================
+        // Swipeable / Sliding Card Container
+        // =====================================================================
+        Item {
+            id: container
             Layout.fillWidth: true
-            visible: card.n.enableSystemMonitor
-            spacing: 4
+            Layout.preferredHeight: {
+                if (card.currentCardIndex === 0) return statsSection.implicitHeight;
+                if (card.currentCardIndex === 1) return mediaSection.implicitHeight;
+                return controlsSection.implicitHeight;
+            }
+            clip: true
 
-            StatRow { n: card.n; icon: "cpu-symbolic"; label: "CPU temp"
-                value: Math.round(card.n.v_cpuTemp) + " °C"; fraction: card.n.v_cpuTemp / 100; tint: card.n.tempColor(card.n.v_cpuTemp) }
-            StatRow { n: card.n; icon: "cpu-symbolic"; label: "CPU load"
-                value: Math.round(card.n.v_cpuUse) + " %"; fraction: card.n.v_cpuUse / 100; tint: card.n.loadColor(card.n.v_cpuUse) }
-            StatRow { n: card.n; icon: "video-display-symbolic"; label: "GPU temp"; visible: card.n.hasGpu
-                value: card.n.v_gpuTemp > 0 ? Math.round(card.n.v_gpuTemp) + " °C" : "sleeping"
-                fraction: card.n.v_gpuTemp / 100; tint: card.n.tempColor(card.n.v_gpuTemp) }
-            StatRow { n: card.n; icon: "video-display-symbolic"; label: "GPU load"; visible: card.n.hasGpu
-                value: Math.round(card.n.v_gpuUse) + " %"; fraction: card.n.v_gpuUse / 100; tint: card.n.loadColor(card.n.v_gpuUse) }
-            StatRow { n: card.n; icon: "memory-symbolic"; label: "RAM"
-                value: (card.n.v_ramUsed / 1073741824).toFixed(1) + " GB"; fraction: card.n.v_ramPct / 100; tint: card.n.loadColor(card.n.v_ramPct) }
-            StatRow { n: card.n; icon: "drive-harddisk-symbolic"; label: "SSD temp"; visible: card.n.hasSsd
-                value: Math.round(card.n.v_ssdTemp) + " °C"; fraction: card.n.v_ssdTemp / 90; tint: card.n.tempColor(card.n.v_ssdTemp + 10) }
-            StatRow { n: card.n; icon: "speedometer-symbolic"; label: "Fan"; visible: card.n.hasFan
-                value: Math.round(card.n.v_fan) + " rpm"; fraction: card.n.v_fan / 6000; tint: card.n.cAccent }
-            StatRow { n: card.n; icon: "clock-symbolic"; label: "Uptime"
-                value: card.fmtUptime(card.n.v_uptime) }
+            Behavior on Layout.preferredHeight { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+
+            // Mouse / Touch Gesture handler for left/right swipe
+            MouseArea {
+                anchors.fill: parent
+                property real startX: 0
+                onPressed: function(mouse) { startX = mouse.x }
+                onReleased: function(mouse) {
+                    var diff = mouse.x - startX;
+                    if (diff > 40) {
+                        // Swipe Right -> previous card
+                        if (card.currentCardIndex > 0) card.currentCardIndex--;
+                        else card.currentCardIndex = 2;
+                    } else if (diff < -40) {
+                        // Swipe Left -> next card
+                        if (card.currentCardIndex < 2) card.currentCardIndex++;
+                        else card.currentCardIndex = 0;
+                    }
+                }
+            }
+
+            // ----------------- CARD 0: SYSTEM MONITOR STATS -----------------
+            ColumnLayout {
+                id: statsSection
+                width: parent.width
+                opacity: card.currentCardIndex === 0 ? 1 : 0
+                visible: opacity > 0
+                x: card.currentCardIndex === 0 ? 0 : (card.currentCardIndex > 0 ? -container.width : container.width)
+                Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+                spacing: 4
+
+                StatRow { n: card.n; icon: "cpu-symbolic"; label: "CPU temp"
+                    value: Math.round(card.n.v_cpuTemp) + " °C"; fraction: card.n.v_cpuTemp / 100; tint: card.n.tempColor(card.n.v_cpuTemp) }
+                StatRow { n: card.n; icon: "cpu-symbolic"; label: "CPU load"
+                    value: Math.round(card.n.v_cpuUse) + " %"; fraction: card.n.v_cpuUse / 100; tint: card.n.loadColor(card.n.v_cpuUse) }
+                StatRow { n: card.n; icon: "video-display-symbolic"; label: "GPU temp"; visible: card.n.hasGpu
+                    value: card.n.v_gpuTemp > 0 ? Math.round(card.n.v_gpuTemp) + " °C" : "sleeping"
+                    fraction: card.n.v_gpuTemp / 100; tint: card.n.tempColor(card.n.v_gpuTemp) }
+                StatRow { n: card.n; icon: "video-display-symbolic"; label: "GPU load"; visible: card.n.hasGpu
+                    value: Math.round(card.n.v_gpuUse) + " %"; fraction: card.n.v_gpuUse / 100; tint: card.n.loadColor(card.n.v_gpuUse) }
+                StatRow { n: card.n; icon: "memory-symbolic"; label: "RAM"
+                    value: (card.n.v_ramUsed / 1073741824).toFixed(1) + " GB"; fraction: card.n.v_ramPct / 100; tint: card.n.loadColor(card.n.v_ramPct) }
+                StatRow { n: card.n; icon: "drive-harddisk-symbolic"; label: "SSD temp"; visible: card.n.hasSsd
+                    value: Math.round(card.n.v_ssdTemp) + " °C"; fraction: card.n.v_ssdTemp / 90; tint: card.n.tempColor(card.n.v_ssdTemp + 10) }
+                StatRow { n: card.n; icon: "battery-symbolic"; label: "Battery"; visible: card.n.hasBattery && card.n.enableBattery
+                    value: Math.round(card.n.v_batPct) + " %" + (card.n.v_batRate > 0.5 ? " ⚡" : "")
+                    fraction: card.n.v_batPct / 100; tint: card.n.v_batPct < 20 ? card.n.cHot : card.n.cGood }
+                StatRow { n: card.n; icon: "speedometer-symbolic"; label: "Fan"; visible: card.n.hasFan
+                    value: Math.round(card.n.v_fan) + " rpm"; fraction: card.n.v_fan / 6000; tint: card.n.cAccent }
+                StatRow { n: card.n; icon: "clock-symbolic"; label: "Uptime"
+                    value: card.fmtUptime(card.n.v_uptime) }
+            }
+
+            // ----------------- CARD 1: MEDIA PLAYER EXPANDED -----------------
+            ColumnLayout {
+                id: mediaSection
+                width: parent.width
+                opacity: card.currentCardIndex === 1 ? 1 : 0
+                visible: opacity > 0
+                x: card.currentCardIndex === 1 ? 0 : (card.currentCardIndex < 1 ? container.width : -container.width)
+                Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+                spacing: 12
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 14
+
+                    // Large Album Artwork
+                    Rectangle {
+                        Layout.preferredWidth: 64; Layout.preferredHeight: 64; radius: 12; color: "#14141c"; clip: true
+                        Image {
+                            anchors.fill: parent
+                            source: card.n.player && card.n.player.artUrl ? card.n.player.artUrl : ""
+                            fillMode: Image.PreserveAspectCrop; asynchronous: true
+                            sourceSize.width: 128; sourceSize.height: 128
+                        }
+                        Kirigami.Icon {
+                            anchors.centerIn: parent; width: 28; height: 28
+                            visible: !(card.n.player && card.n.player.artUrl)
+                            source: "media-playback-start-symbolic"; color: card.n.cAccent; isMask: true
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 2
+                        Text { 
+                            Layout.fillWidth: true
+                            text: card.n.trackTitle || "No Media Playing"
+                            color: card.n.cText; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight 
+                        }
+                        Text { 
+                            Layout.fillWidth: true
+                            text: card.n.trackArtist || "Unknown Artist"
+                            color: card.n.cDim; font.pixelSize: 12; elide: Text.ElideRight 
+                        }
+                        Equalizer { 
+                            n: card.n; active: card.n.playing && card.visible; opacity: card.n.playing ? 1 : 0.3 
+                        }
+                    }
+                }
+
+                // Playback Control Buttons
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 24
+
+                    Rectangle {
+                        width: 36; height: 36; radius: 18; color: "#1c1c28"
+                        Kirigami.Icon { anchors.centerIn: parent; width: 18; height: 18; source: "media-skip-backward-symbolic"; color: card.n.cText; isMask: true }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (card.n.mediaModule) card.n.mediaModule.previousTrack()
+                        }
+                    }
+
+                    Rectangle {
+                        width: 44; height: 44; radius: 22; color: card.n.cPink
+                        Kirigami.Icon { 
+                            anchors.centerIn: parent; width: 22; height: 22
+                            source: card.n.playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic"
+                            color: "#000000"; isMask: true 
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (card.n.mediaModule) card.n.mediaModule.playPause()
+                        }
+                    }
+
+                    Rectangle {
+                        width: 36; height: 36; radius: 18; color: "#1c1c28"
+                        Kirigami.Icon { anchors.centerIn: parent; width: 18; height: 18; source: "media-skip-forward-symbolic"; color: card.n.cText; isMask: true }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (card.n.mediaModule) card.n.mediaModule.nextTrack()
+                        }
+                    }
+                }
+            }
+
+            // ----------------- CARD 2: SYSTEM TRAY CONTROLS -----------------
+            ColumnLayout {
+                id: controlsSection
+                width: parent.width
+                opacity: card.currentCardIndex === 2 ? 1 : 0
+                visible: opacity > 0
+                x: card.currentCardIndex === 2 ? 0 : container.width
+                Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+                spacing: 10
+
+                // Master Volume Slider
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Kirigami.Icon {
+                        source: (card.n.audioModule && card.n.audioModule.muted) ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic"
+                        color: card.n.cAccent; isMask: true
+                        Layout.preferredWidth: 18; Layout.preferredHeight: 18
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (card.n.audioModule) card.n.audioModule.toggleMute()
+                        }
+                    }
+
+                    Rectangle {
+                        id: volTrack
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 6
+                        radius: 3
+                        color: "#1a1a24"
+
+                        Rectangle {
+                            width: parent.width * ((card.n.audioModule ? card.n.audioModule.volume : 0) / 100)
+                            height: parent.height
+                            radius: 3
+                            color: (card.n.audioModule && card.n.audioModule.muted) ? card.n.cDim : card.n.cAccent
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: function(mouse) {
+                                if (card.n.audioModule) {
+                                    var pct = Math.round((mouse.x / volTrack.width) * 100);
+                                    card.n.audioModule.setVolume(pct);
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: (card.n.audioModule ? card.n.audioModule.volume : 0) + "%"
+                        color: card.n.cText
+                        font.family: card.n.monoFont; font.pixelSize: 11
+                        Layout.preferredWidth: 34
+                        horizontalAlignment: Text.AlignRight
+                    }
+                }
+
+                // Quick Status Tiles
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.preferredHeight: 38; radius: 8
+                        color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#1a2233" : "#14141c"
+                        border.color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#2b3c70" : "#1f1f2e"
+                        border.width: 1
+
+                        RowLayout {
+                            anchors { fill: parent; margins: 8 }
+                            Kirigami.Icon {
+                                source: card.n.networkModule ? card.n.networkModule.iconName : "network-wireless-symbolic"
+                                color: (card.n.networkModule && card.n.networkModule.isConnected) ? card.n.cCyan : card.n.cDim
+                                Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: (card.n.networkModule && card.n.networkModule.ssid !== "") ? card.n.networkModule.ssid : "Wi-Fi"
+                                color: card.n.cText; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideRight
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.preferredHeight: 38; radius: 8
+                        color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#1a2233" : "#14141c"
+                        border.color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#2b3c70" : "#1f1f2e"
+                        border.width: 1
+
+                        RowLayout {
+                            anchors { fill: parent; margins: 8 }
+                            Kirigami.Icon {
+                                source: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "bluetooth-active-symbolic" : "bluetooth-symbolic"
+                                color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational) ? card.n.cCyan : card.n.cDim
+                                Layout.preferredWidth: 16; Layout.preferredHeight: 16; isMask: true
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: card.n.bluetoothModule ? card.n.bluetoothModule.statusText : "Bluetooth"
+                                color: card.n.cText; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // Slide / Page Indicator Dots
+        // =====================================================================
+        Row {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 6
+
+            Repeater {
+                model: 3
+                Rectangle {
+                    required property int index
+                    width: card.currentCardIndex === index ? 16 : 6
+                    height: 6
+                    radius: 3
+                    color: card.currentCardIndex === index ? card.n.cAccent : "#2a2a3a"
+                    Behavior on width { NumberAnimation { duration: 200 } }
+                    Behavior on color { ColorAnimation { duration: 200 } }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: card.currentCardIndex = index
+                    }
+                }
+            }
         }
     }
 }
