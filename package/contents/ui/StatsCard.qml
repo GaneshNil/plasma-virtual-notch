@@ -77,6 +77,99 @@ Item {
             }
         }
 
+        // =====================================================================
+        // System Tray Control Center (Quick Toggles & Status)
+        // =====================================================================
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            // 1. Wi-Fi Status Pill
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                radius: 8
+                color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#1a2233" : "#14141c"
+                border.color: (card.n.networkModule && card.n.networkModule.isConnected) ? "#2b3c70" : "#1f1f2e"
+                border.width: 1
+
+                RowLayout {
+                    anchors { fill: parent; margins: 6 }
+                    spacing: 6
+                    Kirigami.Icon {
+                        source: card.n.networkModule ? card.n.networkModule.iconName : "network-wireless-symbolic"
+                        color: (card.n.networkModule && card.n.networkModule.isConnected) ? card.n.cCyan : card.n.cDim
+                        Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                        isMask: true
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: (card.n.networkModule && card.n.networkModule.ssid !== "") ? card.n.networkModule.ssid : "Wi-Fi"
+                        color: (card.n.networkModule && card.n.networkModule.isConnected) ? card.n.cText : card.n.cDim
+                        font.pixelSize: 11; font.weight: Font.Medium
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+
+            // 2. Bluetooth Status Pill
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                radius: 8
+                color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#1a2233" : "#14141c"
+                border.color: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "#2b3c70" : "#1f1f2e"
+                border.width: 1
+
+                RowLayout {
+                    anchors { fill: parent; margins: 6 }
+                    spacing: 6
+                    Kirigami.Icon {
+                        source: (card.n.bluetoothModule && card.n.bluetoothModule.hasConnectedDevices) ? "bluetooth-active-symbolic" : "bluetooth-symbolic"
+                        color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational) ? card.n.cCyan : card.n.cDim
+                        Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                        isMask: true
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: card.n.bluetoothModule ? card.n.bluetoothModule.statusText : "Bluetooth"
+                        color: (card.n.bluetoothModule && card.n.bluetoothModule.isOperational) ? card.n.cText : card.n.cDim
+                        font.pixelSize: 11; font.weight: Font.Medium
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+
+            // 3. Battery Status Pill
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                radius: 8
+                color: (card.n.batteryModule && card.n.batteryModule.isCharging) ? "#16281e" : "#14141c"
+                border.color: (card.n.batteryModule && card.n.batteryModule.isCharging) ? "#225533" : "#1f1f2e"
+                border.width: 1
+                visible: card.n.hasBattery && card.n.enableBattery
+
+                RowLayout {
+                    anchors { fill: parent; margins: 6 }
+                    spacing: 6
+                    Kirigami.Icon {
+                        source: (card.n.batteryModule && card.n.batteryModule.isCharging) ? "battery-charging-symbolic" : "battery-symbolic"
+                        color: (card.n.v_batPct < 20) ? card.n.cHot : card.n.cGood
+                        Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                        isMask: true
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: Math.round(card.n.v_batPct) + "%" + ((card.n.batteryModule && card.n.batteryModule.isCharging) ? " ⚡" : "")
+                        color: card.n.cText
+                        font.family: card.n.monoFont; font.pixelSize: 11; font.weight: Font.Medium
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+        }
+
         // MPRIS Media Section with Full Interactive Playback Controls
         ColumnLayout {
             Layout.fillWidth: true
@@ -237,9 +330,6 @@ Item {
                 value: (card.n.v_ramUsed / 1073741824).toFixed(1) + " GB"; fraction: card.n.v_ramPct / 100; tint: card.n.loadColor(card.n.v_ramPct) }
             StatRow { n: card.n; icon: "drive-harddisk-symbolic"; label: "SSD temp"; visible: card.n.hasSsd
                 value: Math.round(card.n.v_ssdTemp) + " °C"; fraction: card.n.v_ssdTemp / 90; tint: card.n.tempColor(card.n.v_ssdTemp + 10) }
-            StatRow { n: card.n; icon: "battery-symbolic"; label: "Battery"; visible: card.n.hasBattery && card.n.enableBattery
-                value: Math.round(card.n.v_batPct) + " %" + (card.n.v_batRate > 0.5 ? " ⚡" : "")
-                fraction: card.n.v_batPct / 100; tint: card.n.v_batPct < 20 ? card.n.cHot : card.n.cGood }
             StatRow { n: card.n; icon: "speedometer-symbolic"; label: "Fan"; visible: card.n.hasFan
                 value: Math.round(card.n.v_fan) + " rpm"; fraction: card.n.v_fan / 6000; tint: card.n.cAccent }
             StatRow { n: card.n; icon: "clock-symbolic"; label: "Uptime"

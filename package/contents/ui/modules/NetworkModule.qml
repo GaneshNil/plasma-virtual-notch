@@ -1,9 +1,9 @@
 import QtQuick
-import org.kde.networkmanager as NetworkManager
+import org.kde.plasma.networkmanagement as PlasmaNM
 
 /*
  * NetworkModule.qml
- * Wi-Fi SSID, connection state, and network transitions.
+ * Native Plasma NetworkManager integration: connection icon, SSID, and status.
  */
 BaseModule {
     id: netMod
@@ -11,7 +11,16 @@ BaseModule {
     priority: 1
     preferredAccentColor: host ? host.cCyan : "#5cf2ff"
 
-    readonly property bool connected: NetworkManager.NetworkStatus.state === NetworkManager.NetworkStatus.Connected
-    readonly property bool connecting: NetworkManager.NetworkStatus.state === NetworkManager.NetworkStatus.Connecting
-    readonly property string connectionState: NetworkManager.NetworkStatus.state
+    PlasmaNM.ConnectionIcon {
+        id: connIcon
+    }
+
+    PlasmaNM.WirelessStatus {
+        id: wirelessStatus
+    }
+
+    readonly property string iconName: connIcon.connectionIcon || "network-wireless-symbolic"
+    readonly property bool isConnecting: connIcon.connecting
+    readonly property string ssid: wirelessStatus.wifiSSID || ""
+    readonly property bool isConnected: ssid !== "" || (connIcon.connectionIcon !== "" && !connIcon.connectionIcon.includes("disconnected") && !connIcon.connectionIcon.includes("unavailable"))
 }
