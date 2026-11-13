@@ -19,9 +19,19 @@ import org.kde.plasma.private.volume as Vol
 import org.kde.plasma.private.mpris as Mpris
 import org.kde.layershell as LayerShell
 import "components" as Components
+import "modules" as Modules
 
 PlasmoidItem {
     id: root
+
+    // ---------- Pluggable Feature Modules ----------
+    readonly property Modules.MediaModule mediaModule: Modules.MediaModule { host: root; moduleEnabled: root.enableMedia }
+    readonly property Modules.MicrophoneModule micModule: Modules.MicrophoneModule { host: root; moduleEnabled: root.enableMicrophone }
+    readonly property Modules.NotificationModule notificationModule: Modules.NotificationModule { host: root; moduleEnabled: root.enableNotifications }
+    readonly property Modules.AudioModule audioModule: Modules.AudioModule { host: root; moduleEnabled: root.enableAudio }
+    readonly property Modules.NetworkModule networkModule: Modules.NetworkModule { host: root; moduleEnabled: root.enableNetwork }
+    readonly property Modules.BluetoothModule bluetoothModule: Modules.BluetoothModule { host: root; moduleEnabled: root.enableBluetooth }
+    readonly property Modules.BatteryModule batteryModule: Modules.BatteryModule { host: root; moduleEnabled: root.enableBattery }
 
     // ---------- Event Queue & State Arbiter ----------
     readonly property Components.EventQueue eventQueue: Components.EventQueue {
